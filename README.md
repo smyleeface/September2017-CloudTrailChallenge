@@ -4,17 +4,19 @@
 
 * [AWS CloudTrail Event History Now Available to All Customers](https://aws.amazon.com/about-aws/whats-new/2017/08/aws-cloudtrail-event-history-now-available-to-all-customers/) Posted On: Aug 14, 2017
 
-## Pre-requisites
+## Pre-requisites - Do this before the hackathon
 
 The following tools and accounts are required to complete these instructions.
 
-* [Install .NET Core 1.0.x](https://github.com/dotnet/core/blob/master/release-notes/download-archives/1.0.5-download.md)
-* [Install AWS CLI](https://aws.amazon.com/cli/)
+* [Complete Step 1 of the AWS Lambda Getting Started Guide](http://docs.aws.amazon.com/lambda/latest/dg/setup.html)
+  * Setup an AWS account
+  * Setup the AWS CLI
+* Create a CLI profile
   * Use `aws configure --profile lambdasharp` to create a profile to use with the example scripts.
   * Provide an AWS Access Key ID and the corresponding Secret Key
   * `us-west-2` is a good choice for region
   * Leave default output format as `None` it doesn't matter.
-* [Sign-up for an AWS account](https://aws.amazon.com/)
+* [Install .NET Core 1.0.x](https://github.com/dotnet/core/blob/master/release-notes/download-archives/1.0.5-download.md)
 
 ### LEVEL 0 - Setup
 
@@ -51,6 +53,8 @@ In this section you will:
 * Create a new CloudTrail trail
 * Start logging for the new CloudTrail trail
 * Configure SNS notifications for CloudTrail
+* Deploy a lambda to receive CloudTrail SNS notifications
+* Configure an SNS topic trigger for your lambda
 
 #### Create S3 Bucket
 
@@ -201,4 +205,4 @@ Starting CloudTrail service...
 Logs will be delivered to lambdasharp-team0-cloudtrail:
 ```
 
-TODO:  lambda.
+TODO: http://docs.aws.amazon.com/cli/latest/reference/sns/subscribe.html => lambda.
