@@ -38,26 +38,12 @@ namespace CloudTrailer
         
         public void FunctionHandler(SNSEvent evnt, ILambdaContext context)
         {
-            var snsEvent = evnt.Records?[0].Sns;
-            if(snsEvent == null)
+            // ### Level 1 - Create New Trail and Configure Lambda
+            var messages = evnt.Records?.Select(r=> r.Sns?.Message).Where(s => !string.IsNullOrWhiteSpace(s)) ?? 
+                Enumerable.Empty<string>();
+            foreach (var message in messages)
             {
-                return;
-            }
-
-            try
-            {
-//                {
-//                    "s3Bucket": "your-bucket-name","s3ObjectKey": ["AWSLogs/123456789012/CloudTrail/us-east-2/2013/12/13/123456789012_CloudTrail_us-west-2_20131213T1920Z_LnPgDQnpkSKEsppV.json.gz"]
-//                }
-                // var response = await this.S3Client.GetObjectMetadataAsync(snsEvent.Bucket.Name, snsEvent.Object.Key);
-                // return response.Headers.ContentType;
-            }
-            catch(Exception e)
-            {
-                // context.Logger.LogLine($"Error getting object {snsEvent.Object.Key} from bucket {snsEvent.Bucket.Name}. Make sure they exist and your bucket is in the same region as this function.");
-                // context.Logger.LogLine(e.Message);
-                // context.Logger.LogLine(e.StackTrace);
-                throw;
+                context.Logger.LogLine(message);
             }
         }
     }
