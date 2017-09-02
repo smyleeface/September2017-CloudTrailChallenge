@@ -57,6 +57,7 @@ In this section you will:
 * Add permissions to the lambda execution role
 * Deploy a lambda to receive CloudTrail SNS notifications
 * Configure an SNS topic trigger for your lambda
+* Give SNS permission to invoke your lambda
 
 #### Create S3 Bucket
 
@@ -163,7 +164,7 @@ Which produces output like this:
 
 Management events are included by default. Data events are not.  Data events are used to audit access to S3 objects, all other API activity (such as creating a CloutTrail trail, or checking its status) in AWS is a management event.
 
-#### Configure SNS notifications for CloudTrail
+#### <a name="notifySns"></a>Configure SNS notifications for CloudTrail
 
 You can create the SNS topic using the `create-subscription` command.
 
@@ -301,4 +302,43 @@ Creating new Lambda function team0-cloudtrailer
 New Lambda function created
 ```
 
-TODO: http://docs.aws.amazon.com/cli/latest/reference/sns/subscribe.html => lambda.
+#### Configure an SNS topic trigger for your lambda
+
+You can create a trigger for your lambda using the `sns subscribe` command.
+
+* This command requires the sns topic arn (HINT: this was printed as part of the [create SNS notifications](#notifySns) step).
+
+* This command requires the lambda arn. (HINT: try `aws lambda get-function --function-name <team#>-cloudtrailer --profile lambdasharp`)
+
+```bash
+aws sns subscribe --topic-arn arn:aws:sns:us-west-2:<account#>:<team#>-cloudtrail-logs --protocol lambda --notification-endpoint arn:aws:lambda:us-west-2:<account#>:function:<team#>-cloudtrailer --profile lambdasharp
+```
+
+This command produces output that looks like this:
+
+```json
+{
+    "SubscriptionArn": "arn:aws:sns:us-west-2:############:team0-cloudtrail-logs:02be1b87-7d1b-4772-93a9-7a15e2484087"
+}
+```
+
+#### Give SNS permission to invoke your lambda
+
+You can give SNS permission to invoke your lambda using the `add-permission` command.
+
+* This command requires the sns topic arn (HINT: this was printed as part of the [create SNS notifications](#notifySns) step).
+
+```bash
+aws lambda add-permission --function-name <team#>-cloudtrailer --statement-id 1 --action lambda:InvokeFunction --principal sns.amazonaws.com --source-arn arn:aws:sns:us-west-2:<account#>:<team#>-cloudtrail-logs --profile lambdasharp
+```
+
+This command produces output that looks like this:
+
+```json
+{
+    "Statement": "{\"Sid\":\"1\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"sns.amazonaws.com\"},\"Action\":\"lambda:InvokeFunction\",\"Resource\":\"arn:aws:lambda:us-west-2:############:function:team0-cloudtrailer\",\"Condition\":{\"ArnLike\":{\"AWS:SourceArn\":\"arn:aws:sns:us-west-2:############:team0-cloudtrail-logs\"}}}"
+}
+```
+
+
+TODO: setup lambda to log events to cloudwatch
