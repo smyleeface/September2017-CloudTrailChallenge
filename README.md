@@ -53,6 +53,8 @@ In this section you will:
 * Create a new CloudTrail trail
 * Start logging for the new CloudTrail trail
 * Configure SNS notifications for CloudTrail
+* Create an IAM role to manage permissions for you lambda function
+* Add permissions to the lambda execution role
 * Deploy a lambda to receive CloudTrail SNS notifications
 * Configure an SNS topic trigger for your lambda
 
@@ -203,6 +205,100 @@ CloudTrail configuration:
 }
 Starting CloudTrail service...
 Logs will be delivered to lambdasharp-team0-cloudtrail:
+```
+
+#### Create an IAM role to manage permissions for you lambda function
+
+> Note: you must execute this command from the repository root for the `file://` path to find the `role-trust-policy.json` file.
+
+You can create the role using the `create-role` command:
+
+```bash
+aws iam create-role --role-name cloudtrailer-lambda-role --assume-role-policy-document file://support/role-trust-policy.json --profile lambdasharp
+```
+
+This command produces output that looks like this:
+
+```json
+{
+    "Role": {
+        "AssumeRolePolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Action": "sts:AssumeRole",
+                    "Effect": "Allow",
+                    "Principal": {
+                        "Service": "lambda.amazonaws.com"
+                    }
+                }
+            ]
+        },
+        "RoleId": "AROAJVBX5QQ2HYX3FV72S",
+        "CreateDate": "2017-09-02T14:19:35.376Z",
+        "RoleName": "team0-lambda-role",
+        "Path": "/",
+        "Arn": "arn:aws:iam::############:role/cloudtrailer-lambda-role"
+    }
+}
+```
+
+#### Add permissions to the lambda execution role
+
+> Note: you must execute this command from the repository root for the `file://` path to find the `role-trust-policy.json` file.
+
+Edit `support/role-trust-policy.json` to make sure your s3 bucket ARN matches the ARN for your team bucket.
+
+You can update the role permissions using the `put-role-policy` command:
+
+```bash
+aws iam put-role-policy --role-name cloudtrailer-lambda-role --policy-name execution-policy --policy-document file://support/role-execution-policy.json --profile lambdasharp
+```
+
+This command produces no output on success.
+
+#### Deploy a lambda to receive CloudTrail SNS notifications
+
+> Note: for this command to work you must be in the `src/CloudTrailer` folder.
+
+You can deploy the provided lambda with this command:
+
+```bash
+dotnet lambda deploy-function <team#>-cloudtrailer
+```
+
+This command produces output that looks like this:
+
+```text
+Executing publish command
+Deleted previous publish folder
+... invoking 'dotnet publish', working folder '.../September2017-CloudTrailChallenge/src/CloudTrailer/bin/Release/netcoreapp1.0/publish'
+... publish: Microsoft (R) Build Engine version 15.3.409.57025 for .NET Core
+... publish: Copyright (C) Microsoft Corporation. All rights reserved.
+... publish:   CloudTrailer -> .../September2017-CloudTrailChallenge/src/CloudTrailer/bin/Release/netcoreapp1.0/CloudTrailer.dll
+... publish:   CloudTrailer -> .../September2017-CloudTrailChallenge/src/CloudTrailer/bin/Release/netcoreapp1.0/publish/
+Changed permissions on published dll (chmod +r Amazon.Lambda.Core.dll).
+Changed permissions on published dll (chmod +r Amazon.Lambda.Serialization.Json.dll).
+Changed permissions on published dll (chmod +r Amazon.Lambda.SNSEvents.dll).
+Changed permissions on published dll (chmod +r AWSSDK.Core.dll).
+Changed permissions on published dll (chmod +r AWSSDK.SimpleNotificationService.dll).
+Changed permissions on published dll (chmod +r CloudTrailer.dll).
+Changed permissions on published dll (chmod +r Newtonsoft.Json.dll).
+Changed permissions on published dll (chmod +r System.Runtime.Serialization.Primitives.dll).
+Zipping publish folder .../September2017-CloudTrailChallenge/src/CloudTrailer/bin/Release/netcoreapp1.0/publish to .../September2017-CloudTrailChallenge/src/CloudTrailer/bin/Release/netcoreapp1.0/CloudTrailer.zip
+... zipping:   adding: Amazon.Lambda.Core.dll (deflated 57%)
+... zipping:   adding: Amazon.Lambda.Serialization.Json.dll (deflated 56%)
+... zipping:   adding: Amazon.Lambda.SNSEvents.dll (deflated 60%)
+... zipping:   adding: AWSSDK.Core.dll (deflated 66%)
+... zipping:   adding: AWSSDK.SimpleNotificationService.dll (deflated 68%)
+... zipping:   adding: CloudTrailer.deps.json (deflated 72%)
+... zipping:   adding: CloudTrailer.dll (deflated 61%)
+... zipping:   adding: CloudTrailer.pdb (deflated 30%)
+... zipping:   adding: Newtonsoft.Json.dll (deflated 60%)
+... zipping:   adding: System.Runtime.Serialization.Primitives.dll (deflated 48%)
+Created publish archive (.../September2017-CloudTrailChallenge/src/CloudTrailer/bin/Release/netcoreapp1.0/CloudTrailer.zip).
+Creating new Lambda function team0-cloudtrailer
+New Lambda function created
 ```
 
 TODO: http://docs.aws.amazon.com/cli/latest/reference/sns/subscribe.html => lambda.

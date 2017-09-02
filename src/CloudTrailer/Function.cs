@@ -4,9 +4,9 @@ using System.Linq;
 using System.Threading.Tasks;
 
 using Amazon.Lambda.Core;
-using Amazon.Lambda.S3Events;
-using Amazon.S3;
-using Amazon.S3.Util;
+using Amazon.Lambda.SNSEvents;
+using Amazon.SimpleNotificationService;
+
 
 // Assembly attribute to enable the Lambda function's JSON input to be converted into a .NET class.
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.Json.JsonSerializer))]
@@ -15,7 +15,7 @@ namespace CloudTrailer
 {
     public class Function
     {
-        IAmazonS3 S3Client { get; set; }
+        private IAmazonSimpleNotificationService SnsClient { get; }
 
         /// <summary>
         /// Default constructor. This constructor is used by Lambda to construct the instance. When invoked in a Lambda environment
@@ -24,43 +24,39 @@ namespace CloudTrailer
         /// </summary>
         public Function()
         {
-            S3Client = new AmazonS3Client();
+            SnsClient = new AmazonSimpleNotificationServiceClient();
         }
 
         /// <summary>
-        /// Constructs an instance with a preconfigured S3 client. This can be used for testing the outside of the Lambda environment.
+        /// Constructs an instance with a preconfigured client. This can be used for testing the outside of the Lambda environment.
         /// </summary>
-        /// <param name="s3Client"></param>
-        public Function(IAmazonS3 s3Client)
+        /// <param name="snsClient">The client</param>
+        public Function(IAmazonSimpleNotificationService snsClient)
         {
-            this.S3Client = s3Client;
+            SnsClient = snsClient;
         }
         
-        /// <summary>
-        /// This method is called for every Lambda invocation. This method takes in an S3 event object and can be used 
-        /// to respond to S3 notifications.
-        /// </summary>
-        /// <param name="evnt"></param>
-        /// <param name="context"></param>
-        /// <returns></returns>
-        public async Task<string> FunctionHandler(S3Event evnt, ILambdaContext context)
+        public void FunctionHandler(SNSEvent evnt, ILambdaContext context)
         {
-            var s3Event = evnt.Records?[0].S3;
-            if(s3Event == null)
+            var snsEvent = evnt.Records?[0].Sns;
+            if(snsEvent == null)
             {
-                return null;
+                return;
             }
 
             try
             {
-                var response = await this.S3Client.GetObjectMetadataAsync(s3Event.Bucket.Name, s3Event.Object.Key);
-                return response.Headers.ContentType;
+//                {
+//                    "s3Bucket": "your-bucket-name","s3ObjectKey": ["AWSLogs/123456789012/CloudTrail/us-east-2/2013/12/13/123456789012_CloudTrail_us-west-2_20131213T1920Z_LnPgDQnpkSKEsppV.json.gz"]
+//                }
+                // var response = await this.S3Client.GetObjectMetadataAsync(snsEvent.Bucket.Name, snsEvent.Object.Key);
+                // return response.Headers.ContentType;
             }
             catch(Exception e)
             {
-                context.Logger.LogLine($"Error getting object {s3Event.Object.Key} from bucket {s3Event.Bucket.Name}. Make sure they exist and your bucket is in the same region as this function.");
-                context.Logger.LogLine(e.Message);
-                context.Logger.LogLine(e.StackTrace);
+                // context.Logger.LogLine($"Error getting object {snsEvent.Object.Key} from bucket {snsEvent.Bucket.Name}. Make sure they exist and your bucket is in the same region as this function.");
+                // context.Logger.LogLine(e.Message);
+                // context.Logger.LogLine(e.StackTrace);
                 throw;
             }
         }

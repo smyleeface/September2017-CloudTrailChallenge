@@ -5,8 +5,11 @@
   <ItemGroup>
     <PackageReference Include="Amazon.Lambda.Core" Version="1.0.0" />
     <PackageReference Include="Amazon.Lambda.Serialization.Json" Version="1.1.0" />
-    <PackageReference Include="Amazon.Lambda.S3Events" Version="1.0.1" />
-    <PackageReference Include="AWSSDK.S3" Version="3.3.5.13" />
+    <PackageReference Include="Amazon.Lambda.SNSEvents" Version="1.0.0" />
+    <PackageReference Include="AWSSDK.SimpleNotificationService" Version="3.3.0.21" />
+  </ItemGroup>
+  <ItemGroup>
+    <DotNetCliToolReference Include="Microsoft.DotNet.Watcher.Tools" Version="2.0.0" />
   </ItemGroup>
   <ItemGroup>
     <DotNetCliToolReference Include="Amazon.Lambda.Tools" Version="1.7.0" />
