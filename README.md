@@ -58,13 +58,14 @@ In this section you will:
 * Deploy a lambda to receive CloudTrail SNS notifications
 * Configure an SNS topic trigger for your lambda
 * Give SNS permission to invoke your lambda
+* See the lambda create a CloudWatch log entry each time CloudTrail sends a notification
 
 #### Create S3 Bucket
 
 Create a bucket to receive logs using this command (replace `<team#>` with a teamid. example: `team0`):
 
 ```bash
-aws s3api create-bucket --bucket lambdasharp-<team#>-cloudtrail --region us-west-2 --profile lambdasharp
+aws s3api create-bucket --bucket lambdasharp-<team#>-cloudtrail --region us-west-2 --create-bucket-configuration LocationConstraint=us-west-2 --profile lambdasharp
 ```
 
 You should see a response like this:
@@ -340,5 +341,28 @@ This command produces output that looks like this:
 }
 ```
 
+#### See the lambda create a CloudWatch log entry each time CloudTrail sends a notification
 
-TODO: setup lambda to log events to cloudwatch
+Because of the delay associated with CloudTrail, you may see events associated with your work up until now delievered within a few minutes.  However, to be on the safe side, create another user now, which will guarantee that you get an event to work with:
+
+```bash
+aws iam create-user --user-name Alice --profile lambdasharp
+```
+
+On the command line, this command should create output similar to the output you saw when creating `Bob`.
+
+If your lambda is set up correctly then you should see an invocation for this event and the lambda should output the event notification to CloudWatch.
+
+> Hint: Once you see your first notification event in the log, you may save a lot of time by copying it and using it as test input to your lamdba.  Then you will not have to wait for the CloudTrail logging and delivery delays each time you want to test.
+
+### LEVEL 2 - Retrieve Logs from S3
+
+Update your lambda to:
+
+* Parse the incoming notification message to see the CloudTrail messages, which will tell you the bucket and key(s) for the logs which CloudTrail has shipped to S3.
+
+* Retrieve the logs from S3
+
+* Write the logs to CloudWatch
+
+TODO: filter for specific events and send alerts
