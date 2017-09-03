@@ -59,9 +59,12 @@ namespace CloudTrailer
                     {
                         var response = await S3Client.GetObjectAsync(ct.S3Bucket, s);
                         using (var contents = new MemoryStream())
+                        using (var gz = new GZipStream(response.ResponseStream, CompressionMode.Decompress))
                         {
-                            await response.ResponseStream.CopyToAsync(contents);
-                            return Encoding.UTF8.GetString(contents.ToArray());
+                            await gz.CopyToAsync(contents);
+                            var bytes = contents.ToArray();
+                            context.Logger.Log($"{s}: read {bytes.Length} bytes.");
+                            return Encoding.UTF8.GetString(bytes);
                         }
                     }
                     catch (Exception ex)
