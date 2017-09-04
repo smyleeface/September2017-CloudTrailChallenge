@@ -5,6 +5,8 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Amazon.IdentityManagement;
+using Amazon.IdentityManagement.Model;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.SNSEvents;
 using Amazon.S3;
@@ -26,6 +28,7 @@ namespace CloudTrailer
 
         private IAmazonS3 S3Client { get; }
         private IAmazonSimpleNotificationService SnsClient { get; }
+        private IAmazonIdentityManagementService IamClient { get; }
         private static string AlertTopicArn => Environment.GetEnvironmentVariable("AlertTopicArn");
 
         /// <summary>
@@ -37,16 +40,21 @@ namespace CloudTrailer
         {
             S3Client = new AmazonS3Client();
             SnsClient = new AmazonSimpleNotificationServiceClient();
+            IamClient = new AmazonIdentityManagementServiceClient();
         }
 
         /// <summary>
         /// Constructs an instance with a preconfigured client. This can be used for testing the outside of the Lambda environment.
         /// </summary>
-        /// <param name="s3Client">The client</param>
-        public Function(IAmazonS3 s3Client, IAmazonSimpleNotificationService snsClient)
+        /// <param name="s3Client">The bucket client.</param>
+        /// <param name="snsClient">The notification client.</param>
+        /// <param name="iamClient">The identity management client.</param>
+        public Function(IAmazonS3 s3Client, IAmazonSimpleNotificationService snsClient,
+            IAmazonIdentityManagementService iamClient)
         {
             S3Client = s3Client;
             SnsClient = snsClient;
+            IamClient = iamClient;
         }
 
         public async Task FunctionHandler(SNSEvent evnt, ILambdaContext context)
@@ -59,10 +67,46 @@ namespace CloudTrailer
             context.Logger.LogLine(JsonConvert.SerializeObject(loggedEvents));
 
             // ### Level 3 - Filter for specific events and send alerts
-            var filteredEvents = FilterEvents(loggedEvents);
+            var filteredEvents = FilterEvents(loggedEvents).ToList();
             await SendAlerts(filteredEvents);
 
             // ### Boss level - Take mitigating action
+            var unmitigatedEvents = await Mitigate(filteredEvents);
+            if (unmitigatedEvents.Any())
+            {
+                context.Logger.LogLine(
+                    $"No handler available to mitigate these events: {JsonConvert.SerializeObject(unmitigatedEvents)}");
+            }
+        }
+
+
+        private async Task<List<CloudTrailEvent>> Mitigate(IEnumerable<CloudTrailEvent> filteredEvents)
+        {
+            var unmitigated = new List<CloudTrailEvent>();
+            foreach (var filteredEvent in filteredEvents)
+            {
+                if (filteredEvent.EventName == "AttachUserPolicy")
+                {
+                    if (!filteredEvent.RequestParameters["policyArn"].ToString().Contains("AdministratorAccess"))
+                    {
+                        continue;
+                    }
+
+                    var detachUserPolicyRequest = new DetachUserPolicyRequest
+                    {
+                        UserName = filteredEvent.RequestParameters["userName"].ToString(),
+                        PolicyArn = filteredEvent.RequestParameters["policyArn"].ToString()
+                    };
+
+                    await IamClient.DetachUserPolicyAsync(detachUserPolicyRequest);
+                }
+                else
+                {
+                    unmitigated.Add(filteredEvent);
+                }
+            }
+
+            return unmitigated;
         }
 
         private Task<PublishResponse[]> SendAlerts(IEnumerable<CloudTrailEvent> filteredEvents)
@@ -74,9 +118,8 @@ namespace CloudTrailer
 
         private static IEnumerable<CloudTrailEvent> FilterEvents(IEnumerable<CloudTrailEvent> loggedEvents)
         {
-            var interesting = new[] {"CreateUser"};
-            return loggedEvents.Where(logged => interesting.Contains(logged.EventName))
-                .ToList();
+            var interesting = new[] {"AttachUserPolicy"};
+            return loggedEvents.Where(logged => interesting.Contains(logged.EventName));
         }
 
 

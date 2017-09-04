@@ -384,3 +384,7 @@ Update your lamba:
   * Deleting log streams from CloudWatch
 
 * Publish filtered events to your new SNS topic
+
+### Boss level - Take mitigating action
+
+Now that you have found events that may represent security risks, use the AWSSDK to instruct AWS to correct the problems.
