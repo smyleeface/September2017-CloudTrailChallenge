@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.SNSEvents;
 using Amazon.S3;
-using Amazon.S3.Model;
 using Newtonsoft.Json;
 
 
@@ -19,6 +18,8 @@ namespace CloudTrailer
 {
     public class Function
     {
+        private static readonly byte[] GZipHeaderBytes = {0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 4, 0};
+
         private IAmazonS3 S3Client { get; }
 
         /// <summary>
@@ -46,48 +47,74 @@ namespace CloudTrailer
             context.Logger.LogLine(JsonConvert.SerializeObject(evnt));
 
             // ### Level 2 - Retrieve Logs from S3
-            var messages = evnt.Records?.Select(r => r.Sns?.Message).Where(s => !string.IsNullOrWhiteSpace(s)) ??
-                           Enumerable.Empty<string>();
-            foreach (var message in messages)
-            {
-                context.Logger.LogLine(message);
-
-                var ct = JsonConvert.DeserializeObject<CloudTrailMessage>(message);
-                var tasks = ct.S3ObjectKey.Select(async s =>
-                {
-                    try
-                    {
-                        var response = await S3Client.GetObjectAsync(ct.S3Bucket, s);
-                        using (var contents = new MemoryStream())
-                        using (var gz = new GZipStream(response.ResponseStream, CompressionMode.Decompress))
-                        {
-                            await gz.CopyToAsync(contents);
-                            var bytes = contents.ToArray();
-                            context.Logger.Log($"{s}: read {bytes.Length} bytes.");
-                            return Encoding.UTF8.GetString(bytes);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        var e = new
-                        {
-                            Error = $"Could not process {s}",
-                            Exception = ex
-                        };
-                        return JsonConvert.SerializeObject(e);
-                    }
-                });
-                var logs = await Task.WhenAll(tasks);
-                foreach (var log in logs)
-                {
-                    context.Logger.LogLine(log);
-                }
-            }
-
+            var logs = await RetrieveLogEvents(evnt, context);
+            context.Logger.LogLine(JsonConvert.SerializeObject(logs));
 
             // ### Level 3 - Filter for specific events and send alerts
 
             // ### Boss level - Take mitigating action
+        }
+
+        private async Task<List<CloudTrailEvent>> RetrieveLogEvents(SNSEvent evnt, ILambdaContext context)
+        {
+            var messages = evnt.Records.Select(r => r.Sns.Message)
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Select(message =>
+                {
+                    context.Logger.LogLine(message);
+                    return JsonConvert.DeserializeObject<CloudTrailMessage>(message);
+                })
+                .SelectMany(message =>
+                {
+                    return message.S3ObjectKey.Select(async s =>
+                    {
+                        try
+                        {
+                            var response1 = await S3Client.GetObjectAsync(message.S3Bucket, s);
+                            using (var inputStream1 = new MemoryStream())
+                            {
+                                await response1.ResponseStream.CopyToAsync(inputStream1);
+
+                                var input1 = inputStream1.ToArray();
+                                var header1 = new byte[GZipHeaderBytes.Length];
+                                Array.Copy(input1, header1, header1.Length);
+
+                                var gzipped1 = header1.SequenceEqual(GZipHeaderBytes);
+                                context.Logger.LogLine($"Input appears to be gzipped: {gzipped1}");
+
+                                if (gzipped1)
+                                {
+                                    response1.ResponseStream.Position = 0;
+
+                                    using (var contents1 = new MemoryStream())
+                                    using (var gz1 = new GZipStream(response1.ResponseStream, CompressionMode.Decompress))
+                                    {
+                                        await gz1.CopyToAsync(contents1);
+                                        input1 = contents1.ToArray();
+                                    }
+                                }
+
+                                context.Logger.Log($"{s}: read {input1.Length} bytes.");
+                                var serializedRecords1 = Encoding.UTF8.GetString(input1);
+                                context.Logger.Log(serializedRecords1);
+                                return JsonConvert.DeserializeObject<CloudTrailRecords>(serializedRecords1);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            var e1 = new
+                            {
+                                Error = $"Could not process {s}",
+                                Exception = ex
+                            };
+                            context.Logger.LogLine(JsonConvert.SerializeObject(e1));
+                            return new CloudTrailRecords();
+                        }
+                    });
+                });
+            
+            var records = await Task.WhenAll(messages);
+            return records.SelectMany(t => t.Records).ToList();
         }
 
         private class CloudTrailMessage
@@ -95,5 +122,16 @@ namespace CloudTrailer
             public string S3Bucket { get; set; }
             public string[] S3ObjectKey { get; set; }
         }
+
+        private class CloudTrailRecords
+        {
+            public CloudTrailEvent[] Records { get; set; } = new CloudTrailEvent[0];
+        }
+    }
+
+    public class CloudTrailEvent
+    {
+        public string EventSource { get; set; }
+        public string EventName { get; set; }
     }
 }
