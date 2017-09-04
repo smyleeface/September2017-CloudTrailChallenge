@@ -365,4 +365,20 @@ Update your lambda to:
 
 * Write the logs to CloudWatch
 
-TODO: filter for specific events and send alerts
+### LEVEL 3 - Filter for specific events and send alerts
+
+Update your infrastructure:
+
+* Create a new SNS topic to publish filtered events to
+
+* Subscribe to this topic so that you are alerted when a filtered event is detected (Hint: SMS or Email are good choices to explore)
+
+Update your lamba:
+
+* Filter the logged events for events may be interesting from a security perspective.  Some examples:
+  * Granting admin access to IAM users
+  * Associating an Elastic IP to an EC2 instance
+  * Creating a security group with insecure inbound rules
+  * Deleting log streams from CloudWatch
+
+* Publish filtered events to your new SNS topic

@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.SNSEvents;
 using Amazon.S3;
+using CloudTrailer.Models;
 using Newtonsoft.Json;
 
 
@@ -47,91 +48,76 @@ namespace CloudTrailer
             context.Logger.LogLine(JsonConvert.SerializeObject(evnt));
 
             // ### Level 2 - Retrieve Logs from S3
-            var logs = await RetrieveLogEvents(evnt, context);
-            context.Logger.LogLine(JsonConvert.SerializeObject(logs));
+            var loggedEvents = await RetrieveLogEvents(evnt, context);
+            context.Logger.LogLine(JsonConvert.SerializeObject(loggedEvents));
 
             // ### Level 3 - Filter for specific events and send alerts
 
             // ### Boss level - Take mitigating action
         }
 
+
         private async Task<List<CloudTrailEvent>> RetrieveLogEvents(SNSEvent evnt, ILambdaContext context)
         {
             var messages = evnt.Records.Select(r => r.Sns.Message)
                 .Where(s => !string.IsNullOrWhiteSpace(s))
-                .Select(message =>
-                {
-                    context.Logger.LogLine(message);
-                    return JsonConvert.DeserializeObject<CloudTrailMessage>(message);
-                })
-                .SelectMany(message =>
-                {
-                    return message.S3ObjectKey.Select(async s =>
-                    {
-                        try
-                        {
-                            var response1 = await S3Client.GetObjectAsync(message.S3Bucket, s);
-                            using (var inputStream1 = new MemoryStream())
-                            {
-                                await response1.ResponseStream.CopyToAsync(inputStream1);
+                .Select(ConvertMessage)
+                .SelectMany(message => ExtractRecords(context.Logger, message));
 
-                                var input1 = inputStream1.ToArray();
-                                var header1 = new byte[GZipHeaderBytes.Length];
-                                Array.Copy(input1, header1, header1.Length);
-
-                                var gzipped1 = header1.SequenceEqual(GZipHeaderBytes);
-                                context.Logger.LogLine($"Input appears to be gzipped: {gzipped1}");
-
-                                if (gzipped1)
-                                {
-                                    response1.ResponseStream.Position = 0;
-
-                                    using (var contents1 = new MemoryStream())
-                                    using (var gz1 = new GZipStream(response1.ResponseStream, CompressionMode.Decompress))
-                                    {
-                                        await gz1.CopyToAsync(contents1);
-                                        input1 = contents1.ToArray();
-                                    }
-                                }
-
-                                context.Logger.Log($"{s}: read {input1.Length} bytes.");
-                                var serializedRecords1 = Encoding.UTF8.GetString(input1);
-                                context.Logger.Log(serializedRecords1);
-                                return JsonConvert.DeserializeObject<CloudTrailRecords>(serializedRecords1);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            var e1 = new
-                            {
-                                Error = $"Could not process {s}",
-                                Exception = ex
-                            };
-                            context.Logger.LogLine(JsonConvert.SerializeObject(e1));
-                            return new CloudTrailRecords();
-                        }
-                    });
-                });
-            
             var records = await Task.WhenAll(messages);
             return records.SelectMany(t => t.Records).ToList();
         }
 
-        private class CloudTrailMessage
+        private IEnumerable<Task<CloudTrailRecords>> ExtractRecords(ILambdaLogger logger, CloudTrailMessage message)
         {
-            public string S3Bucket { get; set; }
-            public string[] S3ObjectKey { get; set; }
+            return message.S3ObjectKey
+                .Select(logKey => S3Client.GetObjectAsync(message.S3Bucket, logKey))
+                .Select(async s3Request =>
+                {
+                    var response = await s3Request;
+                    using (var inputStream = new MemoryStream())
+                    {
+                        await response.ResponseStream.CopyToAsync(inputStream);
+                        return inputStream.ToArray();
+                    }
+                })
+                .Select(async s3Response =>
+                {
+                    var input = await s3Response;
+                    var appearsGzipped = ResponseAppearsGzipped(input);
+                    logger.LogLine($"Input appears to be gzipped: {appearsGzipped}");
+                    if (appearsGzipped)
+                    {
+                        input = await Decompress(input);
+                    }
+
+                    var serializedRecords = Encoding.UTF8.GetString(input);
+                    logger.Log(serializedRecords);
+                    return JsonConvert.DeserializeObject<CloudTrailRecords>(serializedRecords);
+                });
         }
 
-        private class CloudTrailRecords
+        private static async Task<byte[]> Decompress(byte[] input)
         {
-            public CloudTrailEvent[] Records { get; set; } = new CloudTrailEvent[0];
+            using (var contents = new MemoryStream())
+            using (var gz = new GZipStream(new MemoryStream(input), CompressionMode.Decompress))
+            {
+                await gz.CopyToAsync(contents);
+                return contents.ToArray();
+            }
         }
-    }
 
-    public class CloudTrailEvent
-    {
-        public string EventSource { get; set; }
-        public string EventName { get; set; }
+        private static bool ResponseAppearsGzipped(byte[] input)
+        {
+            var header = new byte[GZipHeaderBytes.Length];
+            Array.Copy(input, header, header.Length);
+            return header.SequenceEqual(GZipHeaderBytes);
+        }
+
+
+        private static CloudTrailMessage ConvertMessage(string message)
+        {
+            return JsonConvert.DeserializeObject<CloudTrailMessage>(message);
+        }
     }
 }
