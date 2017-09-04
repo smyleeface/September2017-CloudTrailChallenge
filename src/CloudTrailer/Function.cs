@@ -52,8 +52,23 @@ namespace CloudTrailer
             context.Logger.LogLine(JsonConvert.SerializeObject(loggedEvents));
 
             // ### Level 3 - Filter for specific events and send alerts
+            var filteredEvents = FilterEvents(loggedEvents);
+            SendAlerts(filteredEvents);
 
             // ### Boss level - Take mitigating action
+        }
+
+        private static void SendAlerts(IEnumerable<CloudTrailEvent> filteredEvents)
+        {
+            Console.WriteLine("Fake alerts follow...");
+            Console.WriteLine(JsonConvert.SerializeObject(filteredEvents));
+        }
+
+        private static IEnumerable<CloudTrailEvent> FilterEvents(IEnumerable<CloudTrailEvent> loggedEvents)
+        {
+            var interesting = new[] {"CreateUser"};
+            return loggedEvents.Where(logged => interesting.Contains(logged.EventName))
+                .ToList();
         }
 
 
