@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.SNSEvents;
 using Amazon.S3;
+using Amazon.SimpleNotificationService;
+using Amazon.SimpleNotificationService.Model;
 using CloudTrailer.Models;
 using Newtonsoft.Json;
 
@@ -19,9 +21,12 @@ namespace CloudTrailer
 {
     public class Function
     {
-        private static readonly byte[] GZipHeaderBytes = {0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 4, 0};
+        private static readonly byte[] GZipHeaderBytes = {0x1f, 0x8b};
+//        private static readonly byte[] GZipHeaderBytes = {0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 4, 0};
 
         private IAmazonS3 S3Client { get; }
+        private IAmazonSimpleNotificationService SnsClient { get; }
+        private static string AlertTopicArn => Environment.GetEnvironmentVariable("AlertTopicArn");
 
         /// <summary>
         /// Default constructor. This constructor is used by Lambda to construct the instance. When invoked in a Lambda environment
@@ -31,15 +36,17 @@ namespace CloudTrailer
         public Function()
         {
             S3Client = new AmazonS3Client();
+            SnsClient = new AmazonSimpleNotificationServiceClient();
         }
 
         /// <summary>
         /// Constructs an instance with a preconfigured client. This can be used for testing the outside of the Lambda environment.
         /// </summary>
         /// <param name="s3Client">The client</param>
-        public Function(IAmazonS3 s3Client)
+        public Function(IAmazonS3 s3Client, IAmazonSimpleNotificationService snsClient)
         {
             S3Client = s3Client;
+            SnsClient = snsClient;
         }
 
         public async Task FunctionHandler(SNSEvent evnt, ILambdaContext context)
@@ -53,15 +60,16 @@ namespace CloudTrailer
 
             // ### Level 3 - Filter for specific events and send alerts
             var filteredEvents = FilterEvents(loggedEvents);
-            SendAlerts(filteredEvents);
+            await SendAlerts(filteredEvents);
 
             // ### Boss level - Take mitigating action
         }
 
-        private static void SendAlerts(IEnumerable<CloudTrailEvent> filteredEvents)
+        private Task<PublishResponse[]> SendAlerts(IEnumerable<CloudTrailEvent> filteredEvents)
         {
-            Console.WriteLine("Fake alerts follow...");
-            Console.WriteLine(JsonConvert.SerializeObject(filteredEvents));
+            var tasks = filteredEvents.Select(filteredEvent =>
+                SnsClient.PublishAsync(AlertTopicArn, JsonConvert.SerializeObject(filteredEvent)));
+            return Task.WhenAll(tasks);
         }
 
         private static IEnumerable<CloudTrailEvent> FilterEvents(IEnumerable<CloudTrailEvent> loggedEvents)

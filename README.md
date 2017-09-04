@@ -373,6 +373,8 @@ Update your infrastructure:
 
 * Subscribe to this topic so that you are alerted when a filtered event is detected (Hint: SMS or Email are good choices to explore)
 
+* Grant lambda permission to publish to the topic
+
 Update your lamba:
 
 * Filter the logged events for events may be interesting from a security perspective.  Some examples:
