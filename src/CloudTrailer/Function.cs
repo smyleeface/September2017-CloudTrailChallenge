@@ -85,13 +85,8 @@ namespace CloudTrailer
             var unmitigated = new List<CloudTrailEvent>();
             foreach (var filteredEvent in filteredEvents)
             {
-                if (filteredEvent.EventName == "AttachUserPolicy")
+                if (DidAttachAdministratorAccessToIamUser(filteredEvent))
                 {
-                    if (!filteredEvent.RequestParameters["policyArn"].ToString().Contains("AdministratorAccess"))
-                    {
-                        continue;
-                    }
-
                     var detachUserPolicyRequest = new DetachUserPolicyRequest
                     {
                         UserName = filteredEvent.RequestParameters["userName"].ToString(),
@@ -109,19 +104,31 @@ namespace CloudTrailer
             return unmitigated;
         }
 
+        private static bool DidAttachAdministratorAccessToIamUser(CloudTrailEvent filteredEvent)
+        {
+            return filteredEvent.EventName == "AttachUserPolicy" &&
+                   filteredEvent.RequestParameters["policyArn"].ToString().Contains("AdministratorAccess");
+        }
+
         private Task<PublishResponse[]> SendAlerts(IEnumerable<CloudTrailEvent> filteredEvents)
         {
             var tasks = filteredEvents.Select(filteredEvent =>
-                SnsClient.PublishAsync(AlertTopicArn, JsonConvert.SerializeObject(filteredEvent)));
+            {
+                var message = JsonConvert.SerializeObject(filteredEvent);
+                if (DidAttachAdministratorAccessToIamUser(filteredEvent))
+                {
+                    message = $"Alert: administrator access granted to {filteredEvent.RequestParameters["userName"]}";
+                }
+
+                return SnsClient.PublishAsync(AlertTopicArn, message);
+            });
             return Task.WhenAll(tasks);
         }
 
         private static IEnumerable<CloudTrailEvent> FilterEvents(IEnumerable<CloudTrailEvent> loggedEvents)
         {
-            var interesting = new[] {"AttachUserPolicy"};
-            return loggedEvents.Where(logged => interesting.Contains(logged.EventName));
+            return loggedEvents.Where(DidAttachAdministratorAccessToIamUser);
         }
-
 
         private async Task<List<CloudTrailEvent>> RetrieveLogEvents(SNSEvent evnt, ILambdaContext context)
         {
