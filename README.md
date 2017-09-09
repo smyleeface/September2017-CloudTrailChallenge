@@ -18,7 +18,7 @@ The following tools and accounts are required to complete these instructions.
   * Leave default output format as `None` it doesn't matter.
 * [Install .NET Core 1.0.x](https://github.com/dotnet/core/blob/master/release-notes/download-archives/1.0.5-download.md)
 
-### LEVEL 0 - Setup
+## LEVEL 0 - Setup
 
 Since CloudTrail is enabled by default you should be able to see the past seven days of events just by [visiting CloudTrail](https://us-west-2.console.aws.amazon.com/cloudtrail/home?region=us-west-2#/dashboard).  However, depending on your account and the services you are using (if any) the event list may not show any events.
 
@@ -44,13 +44,13 @@ You should see a response like this:
 
 Now refresh your CloudTrail console, it may take a minute or two, but according to the [CloudTrail FAQ](https://aws.amazon.com/cloudtrail/faqs/) it can take up to 15 minutes for events to appear.  If you do not see the event after a few minutes, move on to the rest of the setup and check back later.
 
-### Level 1 - Create New Trail and Configure Lambda
+## Level 1 - Create New Trail and Configure Lambda
 
 In this section you will:
 
 * Use the `create-subscription` command to setup your cloudtrail infrastructure
 
-* Create an S3 Bucket to recieve logs
+* Create an S3 Bucket to receive logs
 * Apply a bucket policy that allows CloudTrail to write logs to your bucket
 * Create a new CloudTrail trail
 * Start logging for the new CloudTrail trail
@@ -63,9 +63,9 @@ In this section you will:
 * Give SNS permission to invoke your lambda
 * See the lambda create a CloudWatch log entry each time CloudTrail sends a notification
 
-#### Use the `create-subscription` command to setup your cloudtrail infrastructure
+### Use the `create-subscription` command to setup your cloudtrail infrastructure
 
-`create-subscription` is a highlevel `cloudtrail` command that does alot of the necessary configuration for you.
+`create-subscription` is a high-level `cloudtrail` command that does alot of the necessary configuration for you.
 
 Run this command (replace `<team#>` with a teamid. example: `team0`):
 
@@ -75,7 +75,7 @@ aws cloudtrail create-subscription --s3-new-bucket lambdasharp-<team#>-cloudtrai
 
 You should see a response like this:
 
-```bash
+  ```bash
 Setting up new S3 bucket lambdasharp-team0-cloudtrail...
 Setting up new SNS topic team0-cloudtrail-logs...
 Creating/updating CloudTrail configuration...
@@ -111,7 +111,7 @@ Starting CloudTrail service...
 Logs will be delivered to lambdasharp-team0-cloudtrail:
 ```
 
-#### Create an IAM role to manage permissions for you lambda function
+### Create an IAM role to manage permissions for you lambda function
 
 > Note: you must execute this command from the repository root for the `file://` path to find the `role-trust-policy.json` file.
 
@@ -147,7 +147,7 @@ This command produces output that looks like this:
 }
 ```
 
-#### Add permissions to the lambda execution role
+### Add permissions to the lambda execution role
 
 > Note: you must execute this command from the repository root for the `file://` path to find the `role-trust-policy.json` file.
 
@@ -161,7 +161,7 @@ aws iam put-role-policy --role-name cloudtrailer-lambda-role --policy-name execu
 
 This command produces no output on success.
 
-#### Deploy a lambda to receive CloudTrail SNS notifications
+### Deploy a lambda to receive CloudTrail SNS notifications
 
 > Note: for this command to work you must be in the `src/CloudTrailer` folder.
 
@@ -205,7 +205,7 @@ Creating new Lambda function team0-cloudtrailer
 New Lambda function created
 ```
 
-#### Configure an SNS topic trigger for your lambda
+### Configure an SNS topic trigger for your lambda
 
 You can create a trigger for your lambda using the `sns subscribe` command.
 
@@ -225,7 +225,7 @@ This command produces output that looks like this:
 }
 ```
 
-#### Give SNS permission to invoke your lambda
+### Give SNS permission to invoke your lambda
 
 You can give SNS permission to invoke your lambda using the `add-permission` command.
 
@@ -243,9 +243,9 @@ This command produces output that looks like this:
 }
 ```
 
-#### See the lambda create a CloudWatch log entry each time CloudTrail sends a notification
+### See the lambda create a CloudWatch log entry each time CloudTrail sends a notification
 
-Because of the delay associated with CloudTrail, you may see events associated with your work up until now delievered within a few minutes.  However, to be on the safe side, create another user now, which will guarantee that you get an event to work with:
+Because of the delay associated with CloudTrail, you may see events associated with your work up until now delivered within a few minutes.  However, to be on the safe side, create another user now, which will guarantee that you get an event to work with:
 
 ```bash
 aws iam create-user --user-name Alice --profile lambdasharp
@@ -255,9 +255,9 @@ On the command line, this command should create output similar to the output you
 
 If your lambda is set up correctly then you should see an invocation for this event and the lambda should output the event notification to CloudWatch.
 
-> Hint: Once you see your first notification event in the log, you may save a lot of time by copying it and using it as test input to your lamdba.  Then you will not have to wait for the CloudTrail logging and delivery delays each time you want to test.
+> Hint: Once you see your first notification event in the log, you may save a lot of time by copying it and using it as test input to your lambda.  Then you will not have to wait for the CloudTrail logging and delivery delays each time you want to test.
 
-### LEVEL 2 - Retrieve Logs from S3
+## LEVEL 2 - Retrieve Logs from S3
 
 Update your lambda to:
 
@@ -267,7 +267,7 @@ Update your lambda to:
 
 * Write the logs to CloudWatch
 
-### LEVEL 3 - Filter for specific events and send alerts
+## LEVEL 3 - Filter for specific events and send alerts
 
 Update your infrastructure:
 
@@ -277,12 +277,12 @@ Update your infrastructure:
 
 * Grant lambda permission to publish to the topic
 
-Update your lamba:
+Update your lambda:
 
 * Filter the logged events for events may be interesting from a security perspective.
 
 * Publish filtered events to your new SNS topic
 
-### Boss level - Take mitigating action
+## Boss level - Take mitigating action
 
 Now that you have found events that may represent security risks, use the AWSSDK to instruct AWS to correct the problems.
