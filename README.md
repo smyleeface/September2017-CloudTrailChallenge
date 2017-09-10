@@ -48,20 +48,18 @@ Now refresh your CloudTrail console, it may take a minute or two, but according 
 
 In this section you will:
 
-* Use the `create-subscription` command to setup your cloudtrail infrastructure
-
-* Create an S3 Bucket to receive logs
-* Apply a bucket policy that allows CloudTrail to write logs to your bucket
-* Create a new CloudTrail trail
-* Start logging for the new CloudTrail trail
-* Configure SNS notifications for CloudTrail
-
-* Create an IAM role to manage permissions for your lambda function
-* Add permissions to the lambda execution role
-* Deploy a lambda to receive CloudTrail SNS notifications
-* Configure an SNS topic trigger for your lambda
-* Give SNS permission to invoke your lambda
-* See the lambda create a CloudWatch log entry each time CloudTrail sends a notification
+1. Use the `create-subscription` command to setup your cloudtrail infrastructure
+1. Create an S3 Bucket to receive logs
+1. Apply a bucket policy that allows CloudTrail to write logs to your bucket
+1. Create a new CloudTrail trail
+1. Start logging for the new CloudTrail trail
+1. Configure SNS notifications for CloudTrail
+1. Create an IAM role to manage permissions for your lambda function
+1. Add permissions to the lambda execution role
+1. Deploy a lambda to receive CloudTrail SNS notifications
+1. Configure an SNS topic trigger for your lambda
+1. Give SNS permission to invoke your lambda
+1. See the lambda create a CloudWatch log entry each time CloudTrail sends a notification
 
 ### Use the `create-subscription` command to setup your cloudtrail infrastructure
 
