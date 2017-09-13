@@ -61,7 +61,7 @@ In this section you will:
 1. Give SNS permission to invoke your lambda
 1. See the lambda create a CloudWatch log entry each time CloudTrail sends a notification
 
-### Use the `create-subscription` command to setup your cloudtrail infrastructure
+### <a name="notifySns"></a>Use the `create-subscription` command to setup your cloudtrail infrastructure
 
 `create-subscription` is a high-level `cloudtrail` command that does alot of the necessary configuration for you.
 
@@ -166,6 +166,7 @@ This command produces no output on success.
 You can deploy the provided lambda with this command:
 
 ```bash
+dotnet restore
 dotnet lambda deploy-function <team#>-cloudtrailer
 ```
 
