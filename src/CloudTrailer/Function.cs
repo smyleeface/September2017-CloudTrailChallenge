@@ -43,154 +43,43 @@ namespace CloudTrailer
             IamClient = new AmazonIdentityManagementServiceClient();
         }
 
-        /// <summary>
-        /// Constructs an instance with a preconfigured client. This can be used for testing the outside of the Lambda environment.
-        /// </summary>
-        /// <param name="s3Client">The bucket client.</param>
-        /// <param name="snsClient">The notification client.</param>
-        /// <param name="iamClient">The identity management client.</param>
-        public Function(IAmazonS3 s3Client, IAmazonSimpleNotificationService snsClient,
-            IAmazonIdentityManagementService iamClient)
-        {
-            S3Client = s3Client;
-            SnsClient = snsClient;
-            IamClient = iamClient;
-        }
-
         public async Task FunctionHandler(SNSEvent evnt, ILambdaContext context)
         {
             // ### Level 1 - Create New Trail and Configure Lambda
             context.Logger.LogLine(JsonConvert.SerializeObject(evnt));
 
             // ### Level 2 - Retrieve Logs from S3
-            var loggedEvents = await RetrieveLogEvents(evnt, context);
-            context.Logger.LogLine(JsonConvert.SerializeObject(loggedEvents));
 
             // ### Level 3 - Filter for specific events and send alerts
-            var filteredEvents = FilterEvents(loggedEvents).ToList();
-            await SendAlerts(filteredEvents);
 
             // ### Boss level - Take mitigating action
-            var unmitigatedEvents = await Mitigate(filteredEvents);
-            if (unmitigatedEvents.Any())
-            {
-                context.Logger.LogLine(
-                    $"No handler available to mitigate these events: {JsonConvert.SerializeObject(unmitigatedEvents)}");
-            }
         }
 
 
-        private async Task<List<CloudTrailEvent>> Mitigate(IEnumerable<CloudTrailEvent> filteredEvents)
+        private async Task<CloudTrailRecords> ExtractCloudTrailRecordsAsync(ILambdaLogger logger, byte[] input)
         {
-            var unmitigated = new List<CloudTrailEvent>();
-            foreach (var filteredEvent in filteredEvents)
+            var appearsGzipped = ResponseAppearsGzipped(input);
+            logger.LogLine($"Input appears to be gzipped: {appearsGzipped}");
+            if (appearsGzipped)
             {
-                if (DidAttachAdministratorAccessToIamUser(filteredEvent))
+                using (var contents = new MemoryStream())
+                using (var gz = new GZipStream(new MemoryStream(input), CompressionMode.Decompress))
                 {
-                    var detachUserPolicyRequest = new DetachUserPolicyRequest
-                    {
-                        UserName = filteredEvent.RequestParameters["userName"].ToString(),
-                        PolicyArn = filteredEvent.RequestParameters["policyArn"].ToString()
-                    };
-
-                    await IamClient.DetachUserPolicyAsync(detachUserPolicyRequest);
-                }
-                else
-                {
-                    unmitigated.Add(filteredEvent);
+                    await gz.CopyToAsync(contents);
+                    input = contents.ToArray();
                 }
             }
 
-            return unmitigated;
-        }
+            var serializedRecords = Encoding.UTF8.GetString(input);
+            logger.Log(serializedRecords);
+            return JsonConvert.DeserializeObject<CloudTrailRecords>(serializedRecords);
 
-        private static bool DidAttachAdministratorAccessToIamUser(CloudTrailEvent filteredEvent)
-        {
-            return filteredEvent.EventName == "AttachUserPolicy" &&
-                   filteredEvent.RequestParameters["policyArn"].ToString().Contains("AdministratorAccess");
-        }
-
-        private Task<PublishResponse[]> SendAlerts(IEnumerable<CloudTrailEvent> filteredEvents)
-        {
-            var tasks = filteredEvents.Select(filteredEvent =>
+            bool ResponseAppearsGzipped(byte[] bytes)
             {
-                var message = JsonConvert.SerializeObject(filteredEvent);
-                if (DidAttachAdministratorAccessToIamUser(filteredEvent))
-                {
-                    message = $"Alert: administrator access granted to {filteredEvent.RequestParameters["userName"]}";
-                }
-
-                return SnsClient.PublishAsync(AlertTopicArn, message);
-            });
-            return Task.WhenAll(tasks);
-        }
-
-        private static IEnumerable<CloudTrailEvent> FilterEvents(IEnumerable<CloudTrailEvent> loggedEvents)
-        {
-            return loggedEvents.Where(DidAttachAdministratorAccessToIamUser);
-        }
-
-        private async Task<List<CloudTrailEvent>> RetrieveLogEvents(SNSEvent evnt, ILambdaContext context)
-        {
-            var messages = evnt.Records.Select(r => r.Sns.Message)
-                .Where(s => !string.IsNullOrWhiteSpace(s))
-                .Select(ConvertMessage)
-                .SelectMany(message => ExtractRecords(context.Logger, message));
-
-            var records = await Task.WhenAll(messages);
-            return records.SelectMany(t => t.Records).ToList();
-        }
-
-        private IEnumerable<Task<CloudTrailRecords>> ExtractRecords(ILambdaLogger logger, CloudTrailMessage message)
-        {
-            return message.S3ObjectKey
-                .Select(logKey => S3Client.GetObjectAsync(message.S3Bucket, logKey))
-                .Select(async s3Request =>
-                {
-                    var response = await s3Request;
-                    using (var inputStream = new MemoryStream())
-                    {
-                        await response.ResponseStream.CopyToAsync(inputStream);
-                        return inputStream.ToArray();
-                    }
-                })
-                .Select(async s3Response =>
-                {
-                    var input = await s3Response;
-                    var appearsGzipped = ResponseAppearsGzipped(input);
-                    logger.LogLine($"Input appears to be gzipped: {appearsGzipped}");
-                    if (appearsGzipped)
-                    {
-                        input = await Decompress(input);
-                    }
-
-                    var serializedRecords = Encoding.UTF8.GetString(input);
-                    logger.Log(serializedRecords);
-                    return JsonConvert.DeserializeObject<CloudTrailRecords>(serializedRecords);
-                });
-        }
-
-        private static async Task<byte[]> Decompress(byte[] input)
-        {
-            using (var contents = new MemoryStream())
-            using (var gz = new GZipStream(new MemoryStream(input), CompressionMode.Decompress))
-            {
-                await gz.CopyToAsync(contents);
-                return contents.ToArray();
+                var header = new byte[GZipHeaderBytes.Length];
+                Array.Copy(bytes, header, header.Length);
+                return header.SequenceEqual(GZipHeaderBytes);
             }
-        }
-
-        private static bool ResponseAppearsGzipped(byte[] input)
-        {
-            var header = new byte[GZipHeaderBytes.Length];
-            Array.Copy(input, header, header.Length);
-            return header.SequenceEqual(GZipHeaderBytes);
-        }
-
-
-        private static CloudTrailMessage ConvertMessage(string message)
-        {
-            return JsonConvert.DeserializeObject<CloudTrailMessage>(message);
         }
     }
 }
