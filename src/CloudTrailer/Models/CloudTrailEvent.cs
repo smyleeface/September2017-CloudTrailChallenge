@@ -15,7 +15,7 @@ namespace CloudTrailer.Models
         public string UserAgent { get; set; }
         public Dictionary<string, object> RequestParameters { get; set; }
         public Dictionary<string, object> ResponseElements { get; set; }
-        public Guid RequestId { get; set; }
+        public string RequestId { get; set; }
         public Guid EventId { get; set; }
         public string EventType { get; set; }
         public string RecipientAccountId { get; set; }
