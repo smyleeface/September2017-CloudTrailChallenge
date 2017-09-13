@@ -65,31 +65,31 @@ In this section you will:
 
 `create-subscription` is a high-level `cloudtrail` command that does alot of the necessary configuration for you.
 
-Run this command (replace `<team#>` with a teamid. example: `team0`):
+Run this command (replace `<team#>` with a teamid since S3 buckets must be globally unique. example: `team0`):
 
 ```bash
-aws cloudtrail create-subscription --s3-new-bucket lambdasharp-<team#>-cloudtrail --sns-new-topic <team#>-cloudtrail-logs --name <team#>-trail --profile lambdasharp
+aws cloudtrail create-subscription --s3-new-bucket lambdasharp-<team#>-cloudtrail --sns-new-topic cloudtrail-logs --name cloudtrailer --profile lambdasharp
 ```
 
 You should see a response like this:
 
   ```bash
 Setting up new S3 bucket lambdasharp-team0-cloudtrail...
-Setting up new SNS topic team0-cloudtrail-logs...
+Setting up new SNS topic cloudtrail-logs...
 Creating/updating CloudTrail configuration...
 CloudTrail configuration:
 {
   "trailList": [
     {
       "IncludeGlobalServiceEvents": true,
-      "Name": "team0-trail",
-      "TrailARN": "arn:aws:cloudtrail:us-west-2:############:trail/team0-trail",
+      "Name": "cloudtrailer",
+      "TrailARN": "arn:aws:cloudtrail:us-west-2:############:trail/cloudtrailer",
       "LogFileValidationEnabled": false,
-      "SnsTopicARN": "arn:aws:sns:us-west-2:############:team0-cloudtrail-logs",
+      "SnsTopicARN": "arn:aws:sns:us-west-2:############:cloudtrail-logs",
       "IsMultiRegionTrail": false,
       "HasCustomEventSelectors": false,
       "S3BucketName": "lambdasharp-team0-cloudtrail",
-      "SnsTopicName": "team0-cloudtrail-logs",
+      "SnsTopicName": "cloudtrail-logs",
       "HomeRegion": "us-west-2"
     }
   ], 
@@ -138,7 +138,7 @@ This command produces output that looks like this:
         },
         "RoleId": "AROAJVBX5QQ2HYX3FV72S",
         "CreateDate": "2017-09-02T14:19:35.376Z",
-        "RoleName": "team0-lambda-role",
+        "RoleName": "cloudtrailer-lambda-role",
         "Path": "/",
         "Arn": "arn:aws:iam::############:role/cloudtrailer-lambda-role"
     }
@@ -167,7 +167,7 @@ You can deploy the provided lambda with this command:
 
 ```bash
 dotnet restore
-dotnet lambda deploy-function <team#>-cloudtrailer
+dotnet lambda deploy-function cloudtrailer
 ```
 
 This command produces output that looks like this:
@@ -200,7 +200,7 @@ Zipping publish folder .../September2017-CloudTrailChallenge/src/CloudTrailer/bi
 ... zipping:   adding: Newtonsoft.Json.dll (deflated 60%)
 ... zipping:   adding: System.Runtime.Serialization.Primitives.dll (deflated 48%)
 Created publish archive (.../September2017-CloudTrailChallenge/src/CloudTrailer/bin/Release/netcoreapp1.0/CloudTrailer.zip).
-Creating new Lambda function team0-cloudtrailer
+Creating new Lambda function cloudtrailer
 New Lambda function created
 ```
 
@@ -210,17 +210,17 @@ You can create a trigger for your lambda using the `sns subscribe` command.
 
 * This command requires the sns topic arn (HINT: this was printed as part of the [create SNS notifications](#notifySns) step).
 
-* This command requires the lambda arn. (HINT: try `aws lambda get-function --function-name <team#>-cloudtrailer --profile lambdasharp`)
+* This command requires the lambda arn. (HINT: try `aws lambda get-function --function-name cloudtrailer --profile lambdasharp`)
 
 ```bash
-aws sns subscribe --topic-arn arn:aws:sns:us-west-2:<account#>:<team#>-cloudtrail-logs --protocol lambda --notification-endpoint arn:aws:lambda:us-west-2:<account#>:function:<team#>-cloudtrailer --profile lambdasharp
+aws sns subscribe --topic-arn arn:aws:sns:us-west-2:<account#>:cloudtrail-logs --protocol lambda --notification-endpoint arn:aws:lambda:us-west-2:<account#>:function:cloudtrailer --profile lambdasharp
 ```
 
 This command produces output that looks like this:
 
 ```json
 {
-    "SubscriptionArn": "arn:aws:sns:us-west-2:############:team0-cloudtrail-logs:02be1b87-7d1b-4772-93a9-7a15e2484087"
+    "SubscriptionArn": "arn:aws:sns:us-west-2:############:cloudtrail-logs:02be1b87-7d1b-4772-93a9-7a15e2484087"
 }
 ```
 
@@ -231,14 +231,14 @@ You can give SNS permission to invoke your lambda using the `add-permission` com
 * This command requires the sns topic arn (HINT: this was printed as part of the [create SNS notifications](#notifySns) step).
 
 ```bash
-aws lambda add-permission --function-name <team#>-cloudtrailer --statement-id 1 --action lambda:InvokeFunction --principal sns.amazonaws.com --source-arn arn:aws:sns:us-west-2:<account#>:<team#>-cloudtrail-logs --profile lambdasharp
+aws lambda add-permission --function-name cloudtrailer --statement-id 1 --action lambda:InvokeFunction --principal sns.amazonaws.com --source-arn arn:aws:sns:us-west-2:<account#>:cloudtrail-logs --profile lambdasharp
 ```
 
 This command produces output that looks like this:
 
 ```json
 {
-    "Statement": "{\"Sid\":\"1\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"sns.amazonaws.com\"},\"Action\":\"lambda:InvokeFunction\",\"Resource\":\"arn:aws:lambda:us-west-2:############:function:team0-cloudtrailer\",\"Condition\":{\"ArnLike\":{\"AWS:SourceArn\":\"arn:aws:sns:us-west-2:############:team0-cloudtrail-logs\"}}}"
+    "Statement": "{\"Sid\":\"1\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"sns.amazonaws.com\"},\"Action\":\"lambda:InvokeFunction\",\"Resource\":\"arn:aws:lambda:us-west-2:############:function:cloudtrailer\",\"Condition\":{\"ArnLike\":{\"AWS:SourceArn\":\"arn:aws:sns:us-west-2:############:cloudtrail-logs\"}}}"
 }
 ```
 
