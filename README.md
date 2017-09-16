@@ -4,6 +4,8 @@
 
 * [AWS CloudTrail Event History Now Available to All Customers](https://aws.amazon.com/about-aws/whats-new/2017/08/aws-cloudtrail-event-history-now-available-to-all-customers/) Posted On: Aug 14, 2017
 
+This challenge is about using CloudTrail, S3 and Lambda to monitor your account for actions that might create a security risk.  Although CloudTrail can't prevent security problems from happending (use IAM Policy for that), it can alert you to potentially dangerous actions such as granting administrator access.  The fun part of the challenge will be to decide what events you want to detect and then use your lambda to correct the problem.
+
 ## Pre-requisites - Do this before the hackathon
 
 The following tools and accounts are required to complete these instructions.
