@@ -11,9 +11,6 @@
     <PackageReference Include="AWSSDK.SimpleNotificationService" Version="3.3.0.21" />
   </ItemGroup>
   <ItemGroup>
-    <DotNetCliToolReference Include="Microsoft.DotNet.Watcher.Tools" Version="2.0.0" />
-  </ItemGroup>
-  <ItemGroup>
     <DotNetCliToolReference Include="Amazon.Lambda.Tools" Version="1.7.0" />
   </ItemGroup>
 </Project>

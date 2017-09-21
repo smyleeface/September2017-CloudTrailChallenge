@@ -10,10 +10,12 @@ using Amazon.IdentityManagement.Model;
 using Amazon.Lambda.Core;
 using Amazon.Lambda.SNSEvents;
 using Amazon.S3;
+using Amazon.S3.Model;
 using Amazon.SimpleNotificationService;
 using Amazon.SimpleNotificationService.Model;
 using CloudTrailer.Models;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 
 // Assembly attribute to enable the Lambda function's JSON input to be converted into a .NET class.
@@ -21,8 +23,27 @@ using Newtonsoft.Json;
 
 namespace CloudTrailer
 {
+    public class S3Data {
+            public string s3Bucket { get; set; }
+            public IList<string> s3ObjectKey { get; set; }
+    }
+
+
     public class Function
     {
+        public static byte[] ReadStream(Stream responseStream)
+        {
+            byte[] buffer = new byte[16 * 1024];
+            using (MemoryStream ms = new MemoryStream())
+            {
+                int read;
+                while ((read = responseStream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    ms.Write(buffer, 0, read);
+                }
+                return ms.ToArray();
+            }
+        }
         private static readonly byte[] GZipHeaderBytes = {0x1f, 0x8b};
 //        private static readonly byte[] GZipHeaderBytes = {0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 4, 0};
 
@@ -49,6 +70,22 @@ namespace CloudTrailer
             context.Logger.LogLine(JsonConvert.SerializeObject(evnt));
 
             // ### Level 2 - Retrieve Logs from S3
+            var snsMessage = JsonConvert.DeserializeObject<S3Data>(evnt.Records[0].Sns.Message);
+            String s3Bucket = snsMessage.s3Bucket;
+            String s3ObjectKey = snsMessage.s3ObjectKey[0];
+
+            context.Logger.LogLine(s3Bucket);
+            context.Logger.LogLine(s3ObjectKey);
+            GetObjectRequest request = new GetObjectRequest {
+                BucketName = s3Bucket,
+                Key = s3ObjectKey
+            };
+            var response = await S3Client.GetObjectAsync(request);
+
+            using (Stream reader = response.ResponseStream) {
+                var bytes = ReadStream(reader);
+                await ExtractCloudTrailRecordsAsync(context.Logger, bytes);
+            }
 
             // ### Level 3 - Filter for specific events and send alerts
 

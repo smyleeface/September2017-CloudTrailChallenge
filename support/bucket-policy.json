@@ -5,14 +5,14 @@
             "Effect": "Allow",
             "Principal": { "Service": "cloudtrail.amazonaws.com" },
             "Action": "s3:GetBucketAcl",
-            "Resource": "arn:aws:s3:::lambdasharp-<team#>-cloudtrail"
+            "Resource": "arn:aws:s3:::lambdasharp-cloudtrail-s3"
         },
         {
             "Sid": "AWSCloudTrailWrite20150319",
             "Effect": "Allow",
             "Principal": { "Service": "cloudtrail.amazonaws.com" },
             "Action": "s3:PutObject",
-            "Resource": "arn:aws:s3:::lambdasharp-<team#>-cloudtrail/*",
+            "Resource": "arn:aws:s3:::lambdasharp-cloudtrail-s3/*",
             "Condition": { "StringEquals": { "s3:x-amz-acl": "bucket-owner-full-control" } }
         }
     ]
